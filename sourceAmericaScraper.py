@@ -2,10 +2,9 @@
 import requests
 import csv
 from lxml import html
-pages = 60
 
+num_pages = 60
 base_url = 'https://www.sourceamerica.org/nonprofit-locator?page='
-
 
 def getCompanyName(html_tree: 'html.HtmlElement', row: int) -> str:
     name = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
@@ -63,7 +62,7 @@ def getCompany(html_tree: 'html.HtmlElement', row: int) -> dict:
 
 def getAllCompanies() -> list:
     companies = []
-    for page in range(60):
+    for page in range(num_pages):
         print(f'{{*}} Scraping Page: {page} {{*}}\n')
         res = requests.get(f'{base_url}{page}')
         tree = html.fromstring(res.content)
