@@ -1,72 +1,84 @@
-#!/usr/local/bin/python3
 import requests
 import csv
 from lxml import html
+from typing import List
 
 num_pages = 50
 base_url = 'https://www.sourceamerica.org/nonprofit-locator?page='
 
-def getCompanyName(html_tree: 'html.HtmlElement', row: int) -> str:
-    name = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/h6/span')
-    if len(name) > 0:
-        return name[0].text.replace(',', '')
-    else:
-        return ''
+RAW_BLOCK_CLASS = "views-row"
+ADDRESS_1_CLASS = "address-line1"
+ADDRESS_2_CLASS = "address-line2"
+CITY_CLASS = "locality"
+STATE_CLASS = "administrative-area"
+ZIP_CODE_CLASS = "postal-code"
+COUNTRY_CLASS = "country"
+
+def getElementTextSafe(elem: List['html.HtmlElement']) -> str:
+    res = ''
+    try:
+        res = elem[0].text.replace(',', '')
+    except IndexError:
+        pass
+
+    return res
 
 
-def getCompanyAddress(html_tree: 'html.HtmlElement', row: int) -> dict:
-    street = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[1]')
-    street = street[0].text if street else ''
-    city = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[2]')
-    city = city[0].text if city else ''
-    state = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[3]')
-    state = state[0].text if state else ''
-    zip_code = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[4]')
-    zip_code = zip_code[0].text if zip_code else ''
+def getCompanyName(company_block: 'html.HtmlElement') -> str:
+    return getElementTextSafe(company_block.cssselect("h6 > span"))
+
+
+def getCompanyAddress(company_block: 'html.HtmlElement') -> dict:
+    addr_1 = getElementTextSafe(company_block.find_class(ADDRESS_1_CLASS))
+    addr_2 = getElementTextSafe(company_block.find_class(ADDRESS_2_CLASS))
+    street = f"{addr_1} : {addr_2}" if addr_2 != "" else addr_1
+    city = getElementTextSafe(company_block.find_class(CITY_CLASS))
+    state = getElementTextSafe(company_block.find_class(STATE_CLASS))
+    zip_code = getElementTextSafe(company_block.find_class(ZIP_CODE_CLASS))
 
     return {'street': street, 'city': city, 'state': state, 'zip_code': zip_code}
 
 
-def getCompanyNumber(html_tree: 'html.HtmlElement', row: int) -> str:
-    number = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[2]')
-    if len(number) > 0:
-        return number[0].text
-    else:
-        return ''
+def getCompanyNumber(company_block: 'html.HtmlElement') -> str:
+    number = ''
+    try:
+        number = company_block.find_class('text-16')[0].find_class('my-15')[1].text
+    except IndexError:
+        pass
+    return number
 
 
-def getCompanySite(html_tree: 'html.HtmlElement', row: int) -> str:
-    site = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[3]/a')
-
-    if len(site) > 0:
-        return site[0].text
-    else:
-        return ''
+def getCompanySite(company_block: 'html.HtmlElement') -> str:
+    return getElementTextSafe(company_block.cssselect('a'))
 
 
-def getCompany(html_tree: 'html.HtmlElement', row: int) -> dict:
-    name = getCompanyName(html_tree, row)
-    address = getCompanyAddress(html_tree, row)
-    number = getCompanyNumber(html_tree, row)
-    site = getCompanySite(html_tree, row)
+def getCompany(company_block: 'html.HtmlElement') -> dict:
+    name = getCompanyName(company_block)
+    address = getCompanyAddress(company_block)
+    number = getCompanyNumber(company_block)
+    site = getCompanySite(company_block)
 
     company = {'name': name, **address, 'number': number, 'site': site}
     return company
 
 
-def getAllCompanies() -> list:
+def getAllCompanies() -> List[dict]:
     companies = []
     for page in range(num_pages + 1):
-        print(f'{{*}} Scraping Page: {page} {{*}}\n')
+        print(f'{{*}} Scraping Page: {page} {{*}}')
         res = requests.get(f'{base_url}{page}')
         tree = html.fromstring(res.content)
-        for row in range(1, 13):
-            company = getCompany(tree, row)
-            companies.append(company)
+        raw_company_blocks = tree.find_class(RAW_BLOCK_CLASS)
+        for block in range(12):
+            try:
+                company = getCompany(raw_company_blocks[block])
+                companies.append(company)
+            except IndexError:
+                print(f"Exceeded number of company blocks for page: {page}\tblock: {block}")
     return companies
 
 
-def writeCompanyData(companies: list):
+def writeCompanyData(companies: List[dict]) -> None:
     filename = 'sourceAmericaData.csv'
     print(f'[!] WRITING DATA TO: {filename}')
     with open(filename, 'w', newline='') as csvfile:
