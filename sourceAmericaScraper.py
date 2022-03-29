@@ -3,49 +3,43 @@ import requests
 import csv
 from lxml import html
 
-num_pages = 60
+num_pages = 50
 base_url = 'https://www.sourceamerica.org/nonprofit-locator?page='
 
 def getCompanyName(html_tree: 'html.HtmlElement', row: int) -> str:
-    name = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-    /strong/text()')
+    name = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/h6/span')
     if len(name) > 0:
-        return name[0]
+        return name[0].text.replace(',', '')
     else:
         return ''
 
 
 def getCompanyAddress(html_tree: 'html.HtmlElement', row: int) -> dict:
-    street = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-    /div[1]/div/div/div[1]/div/text()')
-    street = street[0] if street else ''
-    city = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-    /div[1]/div/div/div[2]/span[1]/text()')
-    city = city[0] if city else ''
-    state = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-        /div[1]/div/div/div[2]/span[2]/text()')
-    state = state[0] if state else ''
-    zip_code = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-        /div[1]/div/div/div[2]/span[3]/text()')
-    zip_code = zip_code[0] if zip_code else ''
+    street = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[1]')
+    street = street[0].text if street else ''
+    city = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[2]')
+    city = city[0].text if city else ''
+    state = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[3]')
+    state = state[0].text if state else ''
+    zip_code = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[1]/p/span[4]')
+    zip_code = zip_code[0].text if zip_code else ''
 
     return {'street': street, 'city': city, 'state': state, 'zip_code': zip_code}
 
 
 def getCompanyNumber(html_tree: 'html.HtmlElement', row: int) -> str:
-    number = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-    /div[2]/div/div/text()')
+    number = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[2]')
     if len(number) > 0:
-        return number[0]
+        return number[0].text
     else:
         return ''
 
 
 def getCompanySite(html_tree: 'html.HtmlElement', row: int) -> str:
-    site = html_tree.xpath(f'//*[@id="block-views-affiliates-block-1"]/div/div/div/div[2]/div/div[1]/div[{row}]\
-    /div[3]/div/div/a/text()')
+    site = html_tree.xpath(f'//*[@id="paragraph-966"]/div/div/div/div/div[{row}]/article/div/div/div[3]/a')
+
     if len(site) > 0:
-        return site[0]
+        return site[0].text
     else:
         return ''
 
@@ -62,7 +56,7 @@ def getCompany(html_tree: 'html.HtmlElement', row: int) -> dict:
 
 def getAllCompanies() -> list:
     companies = []
-    for page in range(num_pages):
+    for page in range(num_pages + 1):
         print(f'{{*}} Scraping Page: {page} {{*}}\n')
         res = requests.get(f'{base_url}{page}')
         tree = html.fromstring(res.content)
